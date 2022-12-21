@@ -1,0 +1,294 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+
+typedef struct card {
+  char mast[4];
+  int value;
+  char type[2];
+} card;
+
+typedef struct stack {
+  card *card;
+  struct stack *next;
+} stack;
+
+void push(stack **list, card *a) {
+  stack *p = malloc(sizeof(stack));
+  p->card = a;
+  p->next = *list;
+  *list = p;
+}
+
+card *pop(stack **list) {
+  stack *p = *list;
+  *list = (*list)->next;
+  return (p->card);
+  free(p);
+}
+
+card *init_card(char m[4], char t[2], int v) {
+  card *p = malloc(sizeof(card));
+  strcpy(p->mast, m);
+  strcpy(p->type, t);
+  p->value = v;
+  return (p);
+}
+
+stack *init_stack() {
+  stack *p = NULL;
+  return (p);
+}
+
+stack *init_coloda() {
+  stack *r = init_stack();
+  for (int i = 0; i < 4; i++) {
+    char mast[5];
+    if (i == 0)
+      strcpy(mast, "♥");
+    if (i == 1)
+      strcpy(mast, "♠");
+    if (i == 2)
+      strcpy(mast, "♦");
+    if (i == 3)
+      strcpy(mast, "♣");
+    for (int j = 2; j < 15; j++) {
+      char zn[3];
+      if (j < 11)
+        sprintf(zn, "%d", j);
+      else {
+        if (j == 11)
+          strcpy(zn, "T");
+        if (j == 12)
+          strcpy(zn, "J");
+        if (j == 13)
+          strcpy(zn, "Q");
+        if (j == 14)
+          strcpy(zn, "K");
+      }
+      int points;
+      if (j > 11)
+        points = 10;
+      else
+        points = j;
+      push(&r, init_card(mast, zn, points));
+    }
+  }
+  return (r);
+}
+
+void mix(stack **list) {
+  srand(time(NULL));
+  for (int u = 0; u < 300; u++) {
+    int beru = 1 + rand() % 52;
+    int cladu = 1 + rand() % 51;
+
+    stack *t = *list;
+    stack *q = *list;
+
+    for (int i = 0; i < beru - 1; i++) {
+      t = t->next;
+    }
+
+    for (int i = 0; i < beru - 2; i++) {
+      q = q->next;
+    }
+    if (beru == 1) {
+      *list = t->next;
+    } else {
+      q->next = t->next;
+    }
+    q = *list;
+    for (int i = 0; i < cladu - 1; i++) {
+      q = q->next;
+    }
+    if (cladu == 1) {
+      t->next = *list;
+      *list = t;
+    } else {
+      t->next = q->next;
+      q->next = t;
+    }
+  }
+}
+
+void print(stack *list) {
+  for (stack *p = list; p != NULL; p = p->next) {
+    printf("%s %s\n", p->card->mast, p->card->type);
+  }
+}
+
+typedef struct player {
+  stack *hand;
+  int value;
+  int step;
+  int t;
+} player;
+
+player *init_player() {
+  player *p = malloc(sizeof(player));
+  p->hand = init_stack();
+  p->value = p->step = p->t = 0;
+  return (p);
+}
+
+void get_card(player *player, stack **coloda) {
+  card *card = pop(coloda);
+  push(&(player->hand), card);
+  player->step += 1;
+  if (card->value == 11) {
+    player->t += 1;
+  }
+  player->value += card->value;
+  if (player->value > 21 && player->t > 0) {
+    player->value -= 10;
+    player->t -= 1;
+  }
+}
+
+void show_cards_dealer(player *player) {
+  printf("\nкарты дилера:\n");
+  print(player->hand);
+}
+void show_cards_d_s(player *player) {
+  printf("\nкарты дилера:\n");
+  printf("%s %s\n", player->hand->next->card->mast,
+         player->hand->next->card->type);
+}
+
+void show_cards_player(player *player) {
+  printf("\nваши карты:\n");
+  print(player->hand);
+}
+
+void show_stats(player *player) { printf("%d", player->value); }
+
+void start_game(FILE **file, stack **coloda, player *dealer, player *player) {
+  player->step = player->value = dealer->step = dealer->value = 0;
+  player->t = dealer->t = 0;
+  system("clear");
+  printf("\n");
+  mix(coloda);
+  get_card(dealer, coloda);
+  show_cards_dealer(dealer);
+  fprintf(*file, "карты дилера на старте:\n");
+  fprintf(*file, "%s %s\n", dealer->hand->card->mast, dealer->hand->card->type);
+  get_card(dealer, coloda);
+  fprintf(*file, "скрытая карта дилера:\n");
+  fprintf(*file, "%s %s\n", dealer->hand->card->mast, dealer->hand->card->type);
+  get_card(player, coloda);
+  fprintf(*file, "карты игрока на старте:\n");
+  fprintf(*file, "%s %s\n", player->hand->card->mast, player->hand->card->type);
+  get_card(player, coloda);
+  fprintf(*file, "%s %s\n", player->hand->card->mast, player->hand->card->type);
+  show_cards_player(player);
+  printf("\n");
+}
+
+void mid_game(FILE **file, stack **coloda, player *dealer, player *player,
+              int *l) {
+  printf("взять карту? +/-\n");
+  while (1 == 1) {
+    char choice = '100';
+    scanf("%c", &choice);
+    if (choice == '+') {
+      system("clear");
+      show_cards_d_s(dealer);
+      get_card(player, coloda);
+      fprintf(*file, "вы вытянули:\n");
+      fprintf(*file, "%s %s\n", player->hand->card->mast,
+              player->hand->card->type);
+      show_cards_player(player);
+
+      if (player->value > 21) {
+        *l = 1;
+        break;
+      }
+      printf("взять карту? +/-\n");
+    }
+    if (choice == '-') {
+      break;
+    }
+  }
+}
+
+void dealer_game(FILE **file, stack **coloda, player *dealer, int *l) {
+  if (*l == 0) {
+    while (dealer->value < 20) {
+      get_card(dealer, coloda);
+      fprintf(*file, "дилер вытянул:\n");
+      fprintf(*file, "%s %s\n", dealer->hand->card->mast,
+              dealer->hand->card->type);
+      show_cards_dealer(dealer);
+    }
+  }
+  system("clear");
+}
+
+int empty(stack *list) { return (list == 0); }
+
+void back_cards(stack **list, player *player) {
+  while (empty(player->hand) == 0) {
+    push(list, pop(&(player->hand)));
+  }
+}
+
+void end_game(FILE **file, stack **coloda, player *dealer, player *player,
+              int *l) {
+  show_cards_dealer(dealer);
+  printf("сумма очков дилера: ");
+  show_stats(dealer);
+  printf("\n");
+  show_cards_player(player);
+  printf("ваша сумма: ");
+  show_stats(player);
+
+  if (*l == 1) {
+    printf("\n\nпроигрыш");
+    fprintf(*file, "проигрыш.\n\n\n");
+  } else {
+    if ((dealer->value > player->value && dealer->value < 22) ||
+        (player->value > 21)) {
+      printf("\n\nпроигрыш");
+      fprintf(*file, "проигрыш.\n\n\n");
+
+    } else if (dealer->value == player->value) {
+      printf("\n\nничья");
+    } else {
+      printf("\n\nпобеда");
+      fprintf(*file, "победа.\n\n\n");
+    }
+  }
+}
+
+int main(void) {
+  system("clear");
+
+  FILE *logs;
+  logs = fopen("logs.txt", "w");
+  printf("добро пожаловать в игру BlackJack");
+  stack *coloda = init_coloda();
+  player *dealer = init_player();
+  player *player = init_player();
+  int lose = 0;
+  int *l = &lose;
+  char game_status = '+';
+
+  while (game_status == '+') {
+    game_status = '100';
+    lose = 0;
+    start_game(&logs, &coloda, dealer, player);
+    mid_game(&logs, &coloda, dealer, player, l);
+    dealer_game(&logs, &coloda, dealer, l);
+    end_game(&logs, &coloda, dealer, player, l);
+    back_cards(&coloda, player);
+    back_cards(&coloda, dealer);
+
+    printf("\n\nпродолжить игру? +/-\n");
+    scanf(" %c", &game_status);
+  }
+  printf("до свидания");
+  return (0);
+}
